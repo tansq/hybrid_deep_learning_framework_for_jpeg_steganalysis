@@ -1,0 +1,22 @@
+net: "./basic500k_stego40_exp.prototxt"
+snapshot_prefix: "snapshot/basic500k_stego40_exp"
+
+
+test_iter: 5000
+test_interval: 10000
+
+base_lr: 0.001
+lr_policy: "step"
+stepsize: 5000
+gamma: 0.9
+display: 1000
+max_iter: 200000
+
+# snapshot intermediate results
+snapshot: 10000
+
+momentum: 0.9
+weight_decay: 0.0005
+solver_mode: GPU
+
+random_seed: 1490

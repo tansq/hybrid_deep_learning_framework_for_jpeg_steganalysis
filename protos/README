@@ -1,0 +1,5 @@
+basic500k_stego40_exp.prototxt: The prototype of our proposed framework with type1 subnets.
+basic500k_stego40_type2_exp.prototxt: The prototype of our proposed framework with type2 subnets.
+basic500k_stego40_exp_solver.prototxt: The solver used in the experiments.
+basic500k_stego40_exp_trained.caffemodel: The Caffe model trained with basic500K cover images and the corresponding J-UNIWARD 0.4bpnzac stego images.
+test_basic500k_stego40.sh: The shell script used to test the performance of basic500k_stego40_exp_trained.caffemodel.

@@ -1,0 +1,12 @@
+dctrqt_caffe.patch is a patch file which is generated using the
+following command at the top of dctrqt_caffe source tree:
+
+$ git diff --no-prefix > dctrqt_caffe.patch
+
+You can patch the official Caffe source tree using the following
+command:
+
+$ patch -p0 < dctrqt_caffe.patch
+
+Please note that our branch is created at the top of official Caffe
+commitment hash f19f0f17e711045d25dacb20f9b5ef6d39eb8aad.

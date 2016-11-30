@@ -1,0 +1,433 @@
+diff --git Makefile Makefile
+index 5424c3a..5ced839 100644
+--- Makefile
++++ Makefile
+@@ -402,8 +402,8 @@ CXXFLAGS += -MMD -MP
+ 
+ # Complete build flags.
+ COMMON_FLAGS += $(foreach includedir,$(INCLUDE_DIRS),-I$(includedir))
+-CXXFLAGS += -pthread -fPIC $(COMMON_FLAGS) $(WARNINGS)
+-NVCCFLAGS += -ccbin=$(CXX) -Xcompiler -fPIC $(COMMON_FLAGS)
++CXXFLAGS += -pthread -fPIC $(COMMON_FLAGS) $(WARNINGS) --std=c++11
++NVCCFLAGS += -ccbin=$(CXX) -Xcompiler -fPIC $(COMMON_FLAGS) --std=c++11
+ # mex may invoke an older gcc that is too liberal with -Wuninitalized
+ MATLAB_CXXFLAGS := $(CXXFLAGS) -Wno-uninitialized
+ LINKFLAGS += -pthread -fPIC $(COMMON_FLAGS) $(WARNINGS)
+@@ -498,7 +498,7 @@ $(PY$(PROJECT)_SO): $(PY$(PROJECT)_SRC) $(PY$(PROJECT)_HXX) | $(DYNAMIC_NAME)
+ 	@ echo CXX/LD -o $@ $<
+ 	$(Q)$(CXX) -shared -o $@ $(PY$(PROJECT)_SRC) \
+ 		-o $@ $(LINKFLAGS) -l$(LIBRARY_NAME) $(PYTHON_LDFLAGS) \
+-		-Wl,-rpath,$(ORIGIN)/../../build/lib
++		-Wl,-rpath,$(ORIGIN)/../../build/lib --std=c++11
+ 
+ mat$(PROJECT): mat
+ 
+@@ -593,19 +593,19 @@ $(TEST_ALL_BIN): $(TEST_MAIN_SRC) $(TEST_OBJS) $(GTEST_OBJ) \
+ 		| $(DYNAMIC_NAME) $(TEST_BIN_DIR)
+ 	@ echo CXX/LD -o $@ $<
+ 	$(Q)$(CXX) $(TEST_MAIN_SRC) $(TEST_OBJS) $(GTEST_OBJ) \
+-		-o $@ $(LINKFLAGS) $(LDFLAGS) -l$(LIBRARY_NAME) -Wl,-rpath,$(ORIGIN)/../lib
++		-o $@ $(LINKFLAGS) $(LDFLAGS) -l$(LIBRARY_NAME) -Wl,-rpath,$(ORIGIN)/../lib --std=c++11
+ 
+ $(TEST_CU_BINS): $(TEST_BIN_DIR)/%.testbin: $(TEST_CU_BUILD_DIR)/%.o \
+ 	$(GTEST_OBJ) | $(DYNAMIC_NAME) $(TEST_BIN_DIR)
+ 	@ echo LD $<
+ 	$(Q)$(CXX) $(TEST_MAIN_SRC) $< $(GTEST_OBJ) \
+-		-o $@ $(LINKFLAGS) $(LDFLAGS) -l$(LIBRARY_NAME) -Wl,-rpath,$(ORIGIN)/../lib
++		-o $@ $(LINKFLAGS) $(LDFLAGS) -l$(LIBRARY_NAME) -Wl,-rpath,$(ORIGIN)/../lib --std=c++11
+ 
+ $(TEST_CXX_BINS): $(TEST_BIN_DIR)/%.testbin: $(TEST_CXX_BUILD_DIR)/%.o \
+ 	$(GTEST_OBJ) | $(DYNAMIC_NAME) $(TEST_BIN_DIR)
+ 	@ echo LD $<
+ 	$(Q)$(CXX) $(TEST_MAIN_SRC) $< $(GTEST_OBJ) \
+-		-o $@ $(LINKFLAGS) $(LDFLAGS) -l$(LIBRARY_NAME) -Wl,-rpath,$(ORIGIN)/../lib
++		-o $@ $(LINKFLAGS) $(LDFLAGS) -l$(LIBRARY_NAME) -Wl,-rpath,$(ORIGIN)/../lib --std=c++11
+ 
+ # Target for extension-less symlinks to tool binaries with extension '*.bin'.
+ $(TOOL_BUILD_DIR)/%: $(TOOL_BUILD_DIR)/%.bin | $(TOOL_BUILD_DIR)
+diff --git include/caffe/filler.hpp include/caffe/filler.hpp
+index dad9ad4..6f5c8a9 100644
+--- include/caffe/filler.hpp
++++ include/caffe/filler.hpp
+@@ -261,33 +261,65 @@ class BilinearFiller : public Filler<Dtype> {
+   }
+ };
+ 
++  /*by Jishen Zeng,those filler is copy from DCTR,and used to generate 25 DCT bases*/
++template <typename Dtype>
++class DctrFiller : public Filler<Dtype> {
++ public:
++  explicit DctrFiller(const FillerParameter& param)
++      : Filler<Dtype>(param) {}
++  virtual void Fill(Blob<Dtype>* blob) {
++    float PI = 3.141592654f;
++    Dtype* weights = blob->mutable_cpu_data();
++    int mode_r;
++    int mode_c;
++    int m;
++    int n;
++
++    for (int i=0;i<blob->num();i++){
++      mode_r=i/5;
++      mode_c=i%5;
++      for(int j=0;j<25;j++){
++	m=j/5;
++	n=j%5;
++	float wr = sqrt(2.0f); if (mode_r==0) wr=1;
++	float wc = sqrt(2.0f); if (mode_c==0) wc=1;
++	float val = ((wr*wc)/5) * cos(PI*mode_r*(2*m+1) / 10) * cos(PI*mode_c*(2*n+1) / 10);
++	weights[i*25+j] = val;
++      }
++    }
++  }
++};
++
++
+ /**
+  * @brief Get a specific filler from the specification given in FillerParameter.
+  *
+  * Ideally this would be replaced by a factory pattern, but we will leave it
+  * this way for now.
+  */
+-template <typename Dtype>
++template<typename Dtype>
+ Filler<Dtype>* GetFiller(const FillerParameter& param) {
+-  const std::string& type = param.type();
+-  if (type == "constant") {
+-    return new ConstantFiller<Dtype>(param);
+-  } else if (type == "gaussian") {
+-    return new GaussianFiller<Dtype>(param);
+-  } else if (type == "positive_unitball") {
+-    return new PositiveUnitballFiller<Dtype>(param);
+-  } else if (type == "uniform") {
+-    return new UniformFiller<Dtype>(param);
+-  } else if (type == "xavier") {
+-    return new XavierFiller<Dtype>(param);
+-  } else if (type == "msra") {
+-    return new MSRAFiller<Dtype>(param);
+-  } else if (type == "bilinear") {
+-    return new BilinearFiller<Dtype>(param);
+-  } else {
+-    CHECK(false) << "Unknown filler name: " << param.type();
+-  }
+-  return (Filler<Dtype>*)(NULL);
++	const std::string& type = param.type();
++	if (type == "constant") {
++		return new ConstantFiller<Dtype>(param);
++	} else if (type == "gaussian") {
++		return new GaussianFiller<Dtype>(param);
++	} else if (type == "positive_unitball") {
++		return new PositiveUnitballFiller<Dtype>(param);
++	} else if (type == "uniform") {
++		return new UniformFiller<Dtype>(param);
++	} else if (type == "xavier") {
++		return new XavierFiller<Dtype>(param);
++	} else if (type == "msra") {
++		return new MSRAFiller<Dtype>(param);
++	} else if (type == "bilinear") {
++		return new BilinearFiller<Dtype>(param);
++	} else if (type == "dctr") {
++	        return new DctrFiller<Dtype>(param);
++	} else {
++		CHECK(false) << "Unknown filler name: " << param.type();
++	}
++	return (Filler<Dtype>*) (NULL);
+ }
+ 
+ }  // namespace caffe
+diff --git include/caffe/layers/dctrqt_layer.hpp include/caffe/layers/dctrqt_layer.hpp
+new file mode 100644
+index 0000000..c0855b7
+--- /dev/null
++++ include/caffe/layers/dctrqt_layer.hpp
+@@ -0,0 +1,42 @@
++#ifndef CAFFE_DCTRQT_LAYER_HPP_
++#define CAFFE_DCTRQT_LAYER_HPP_
++
++#include <vector>
++
++#include "caffe/blob.hpp"
++#include "caffe/layer.hpp"
++#include "caffe/proto/caffe.pb.h"
++
++#include "caffe/layers/neuron_layer.hpp"
++
++namespace caffe {
++// tansq. DctrQTLayer definition.
++template <typename Dtype>
++class DctrQTLayer : public NeuronLayer<Dtype> {
++ public:
++  explicit DctrQTLayer(const LayerParameter& param)
++      : NeuronLayer<Dtype>(param) {}
++  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
++      const vector<Blob<Dtype>*>& top);
++
++  virtual inline const char* type() const { return "DctrQT"; }
++  virtual inline int ExactNumBottomBlobs() const { return 1; }
++  virtual inline int ExactNumTopBlobs() const { return 1; }
++
++ protected:
++  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
++      const vector<Blob<Dtype>*>& top);
++  virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
++      const vector<Blob<Dtype>*>& top);
++
++  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
++      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
++  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
++      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
++  unsigned int uint_thres_;
++  vector<Dtype> f_qsteps_;
++};
++
++} //namespace caffe
++
++#endif // CAFFE_DCTRQT_LAYER_HPP_
+diff --git include/caffe/util/math_functions.hpp include/caffe/util/math_functions.hpp
+index 6f6d3fe..35b86cf 100644
+--- include/caffe/util/math_functions.hpp
++++ include/caffe/util/math_functions.hpp
+@@ -138,6 +138,8 @@ DEFINE_CAFFE_CPU_UNARY_FUNC(sgnbit, \
+     y[i] = static_cast<bool>((std::signbit)(x[i])));
+ 
+ DEFINE_CAFFE_CPU_UNARY_FUNC(fabs, y[i] = std::fabs(x[i]));
++//tansq.
++DEFINE_CAFFE_CPU_UNARY_FUNC(round, y[i] = std::round(x[i]));
+ 
+ template <typename Dtype>
+ void caffe_cpu_scale(const int n, const Dtype alpha, const Dtype *x, Dtype* y);
+diff --git include/caffe/util/mkl_alternate.hpp include/caffe/util/mkl_alternate.hpp
+index 3355b66..2619d95 100644
+--- include/caffe/util/mkl_alternate.hpp
++++ include/caffe/util/mkl_alternate.hpp
+@@ -35,6 +35,7 @@ DEFINE_VSL_UNARY_FUNC(Sqr, y[i] = a[i] * a[i]);
+ DEFINE_VSL_UNARY_FUNC(Exp, y[i] = exp(a[i]));
+ DEFINE_VSL_UNARY_FUNC(Ln, y[i] = log(a[i]));
+ DEFINE_VSL_UNARY_FUNC(Abs, y[i] = fabs(a[i]));
++DEFINE_VSL_UNARY_FUNC(Round, y[i] = round(a[i]));
+ 
+ // A simple way to define the vsl unary functions with singular parameter b.
+ // The operation should be in the form e.g. y[i] = pow(a[i], b)
+diff --git src/caffe/layers/dctrqt_layer.cpp src/caffe/layers/dctrqt_layer.cpp
+new file mode 100644
+index 0000000..c80c51d
+--- /dev/null
++++ src/caffe/layers/dctrqt_layer.cpp
+@@ -0,0 +1,80 @@
++#include <algorithm>
++#include <vector>
++
++#include "caffe/layers/dctrqt_layer.hpp"
++
++namespace caffe {
++
++template <typename Dtype>
++void DctrQTLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
++      const vector<Blob<Dtype>*>& top) {
++  NeuronLayer<Dtype>::LayerSetUp(bottom, top);
++  CHECK_NE(top[0], bottom[0]) << this->type() << " Layer does not "
++    "allow in-place computation.";
++  DctrQTParameter dctrqt_param = this->layer_param().dctrqt_param();
++  uint_thres_=dctrqt_param.threshold();
++  f_qsteps_=vector<Dtype>(top[0]->count(),
++			  dctrqt_param.quantization_step());
++}
++
++template <typename Dtype>
++void DctrQTLayer<Dtype>::Forward_cpu(
++    const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
++  const int count = top[0]->count();
++  Dtype* top_data = top[0]->mutable_cpu_data();
++  
++  //tansq. from DCTR.m
++  //R = abs(round(R / q));      
++  //R(R > T) = T;
++  
++  //1. R/q.
++  if(f_qsteps_.empty()){
++    DctrQTParameter dctrqt_param = this->layer_param().dctrqt_param();
++    uint_thres_=dctrqt_param.threshold();
++    f_qsteps_=vector<Dtype>(top[0]->count(),
++                            dctrqt_param.quantization_step());
++  }
++  caffe_div(count,bottom[0]->cpu_data(),f_qsteps_.data(),top_data);
++  //2. rounding.
++  caffe_cpu_round(count,top_data,top_data);
++  //3. abs.
++  caffe_abs(count,top_data, top_data);
++  //4. threshold.
++  for (int i = 0; i < count; ++i) {
++    top_data[i] = (top_data[i] > uint_thres_) ? uint_thres_ : top_data[i];
++  }
++}
++
++template <typename Dtype>
++void DctrQTLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
++    const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) {
++  const int count = top[0]->count();
++  const Dtype* top_diff = top[0]->cpu_diff();
++  if (propagate_down[0]) {
++    const Dtype* bottom_data = bottom[0]->cpu_data();
++    Dtype* bottom_diff = bottom[0]->mutable_cpu_diff();
++    caffe_cpu_sign(count, bottom_data, bottom_diff);
++    //tansq. in order to revert the effect of truncation, we just
++    //backprop the diff to the corresponding bottom value higher than the
++    //threshold. 
++
++    //tansq. rounding. no official bypass. just backprop the diff as it does
++    //not take effect.
++
++    //tansq. quantization. (x/q)'=1/q.
++    //sign*top_diff
++    caffe_mul(count, bottom_diff, top_diff, bottom_diff);
++    //val/q
++    caffe_div(count, bottom_diff, f_qsteps_.data(), bottom_diff);
++  }
++}
++
++#ifdef CPU_ONLY
++STUB_GPU(DctrQTLayer);
++#endif
++
++INSTANTIATE_CLASS(DctrQTLayer);
++REGISTER_LAYER_CLASS(DctrQT);
++
++}  // namespace caffe
++
+diff --git src/caffe/layers/dctrqt_layer.cu src/caffe/layers/dctrqt_layer.cu
+new file mode 100644
+index 0000000..3666503
+--- /dev/null
++++ src/caffe/layers/dctrqt_layer.cu
+@@ -0,0 +1,68 @@
++#include <algorithm>
++#include <vector>
++
++#include "caffe/layers/dctrqt_layer.hpp"
++
++namespace caffe {
++
++template <typename Dtype>
++__global__ void DctrQTForward(const int n, const Dtype* in, Dtype* out,
++			      unsigned int uint_thres,float f_qstep) {
++  CUDA_KERNEL_LOOP(index, n) {
++    out[index]=in[index]/f_qstep;
++    int c=(int)out[index];
++    if(out[index]>=0){
++      out[index]=out[index]-c>=0.5 ? c+1 : c;
++    }else{
++      out[index]=out[index]-c<=-0.5 ? 1-c : -c;
++    }
++    if(out[index]>uint_thres)
++      out[index]=uint_thres;
++  }
++}
++
++template <typename Dtype>
++void DctrQTLayer<Dtype>::Forward_gpu(
++    const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
++  const int count = top[0]->count();
++  const Dtype* bottom_data = bottom[0]->gpu_data();
++  Dtype* top_data = top[0]->mutable_gpu_data();
++  unsigned int uint_thres=this->layer_param().dctrqt_param().threshold();
++  Dtype f_qstep=this->layer_param().dctrqt_param().quantization_step();
++  DctrQTForward<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
++  		     count, bottom_data, top_data, uint_thres,f_qstep);
++  CUDA_POST_KERNEL_CHECK;
++}
++
++template <typename Dtype>
++__global__ void DctrQTBackward_div(const int n, const Dtype* in_diff,
++    const Dtype* in_data, Dtype* out_diff,float f_qstep) {
++  CUDA_KERNEL_LOOP(index, n) {
++    out_diff[index]=in_diff[index] / f_qstep;
++  }
++}
++
++template <typename Dtype>
++void DctrQTLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
++    const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom) {
++  const int count = top[0]->count();
++  const Dtype* top_data = top[0]->gpu_data();
++  const Dtype* top_diff = top[0]->gpu_diff();
++  Dtype f_qstep=this->layer_param().dctrqt_param().quantization_step();
++
++  if (propagate_down[0]) {
++    const Dtype* bottom_data = bottom[0]->gpu_data();
++    Dtype* bottom_diff = bottom[0]->mutable_gpu_diff();
++    caffe_gpu_sign(count, bottom_data, bottom_diff);
++    caffe_gpu_mul(count, bottom_diff, top_diff, bottom_diff);
++    // NOLINT_NEXT_LINE(whitespace/operators)
++    DctrQTBackward_div<Dtype><<<CAFFE_GET_BLOCKS(count), CAFFE_CUDA_NUM_THREADS>>>(
++        count, top_diff, bottom_data, bottom_diff,f_qstep);
++    CUDA_POST_KERNEL_CHECK;
++  }
++}
++
++INSTANTIATE_LAYER_GPU_FUNCS(DctrQTLayer);
++
++
++}  // namespace caffe
+diff --git src/caffe/net.cpp src/caffe/net.cpp
+index 23d94c9..c7b71a6 100644
+--- src/caffe/net.cpp
++++ src/caffe/net.cpp
+@@ -853,6 +853,8 @@ void Net<Dtype>::ToProto(NetParameter* param, bool write_diff) const {
+   for (int i = 0; i < layers_.size(); ++i) {
+     LayerParameter* layer_param = param->add_layer();
+     layers_[i]->ToProto(layer_param, write_diff);
++    // change by Jishen Zeng
++    DLOG(INFO) << "Worng layer:" << layer_param->name(); 
+   }
+ }
+ 
+diff --git src/caffe/proto/caffe.proto src/caffe/proto/caffe.proto
+index 6900bb7..670b1ce 100644
+--- src/caffe/proto/caffe.proto
++++ src/caffe/proto/caffe.proto
+@@ -307,6 +307,7 @@ message ParamSpec {
+ // Update the next available ID when you add a new LayerParameter field.
+ //
+ // LayerParameter next available layer-specific ID: 145 (last added: crop_param)
++//--zjs LayerParameter next available layer-specific ID: 146 (last added:dctrqt_param)
+ message LayerParameter {
+   optional string name = 1; // the layer name
+   optional string type = 2; // the layer type
+@@ -364,6 +365,7 @@ message LayerParameter {
+   optional DataParameter data_param = 107;
+   optional DropoutParameter dropout_param = 108;
+   optional DummyDataParameter dummy_data_param = 109;
++  optional DctrQTParameter dctrqt_param=145;
+   optional EltwiseParameter eltwise_param = 110;
+   optional ELUParameter elu_param = 140;
+   optional EmbedParameter embed_param = 137;
+@@ -720,6 +722,13 @@ message ExpParameter {
+   optional float shift = 3 [default = 0.0];
+ }
+ 
++// Message that stores parameters used by DctrQTLayer
++message DctrQTParameter {
++  optional uint32 threshold = 1 [default = 4];
++  optional float quantization_step = 2 [default=4.0];
++}
++
++
+ /// Message that stores parameters used by FlattenLayer
+ message FlattenParameter {
+   // The first axis to flatten: all preceding axes are retained in the output.
+@@ -1219,6 +1228,7 @@ message V1LayerParameter {
+     TANH = 23;
+     WINDOW_DATA = 24;
+     THRESHOLD = 31;
++    DCTRQT = 43;
+   }
+   optional LayerType type = 5;
+   repeated BlobProto blobs = 6;
+@@ -1262,6 +1272,7 @@ message V1LayerParameter {
+   optional TransformationParameter transform_param = 36;
+   optional LossParameter loss_param = 42;
+   optional V0LayerParameter layer = 1;
++  optional DctrQTParameter dctrqt_param= 44;
+ }
+ 
+ // DEPRECATED: V0LayerParameter is the old way of specifying layer parameters

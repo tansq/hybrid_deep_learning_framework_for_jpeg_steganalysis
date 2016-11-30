@@ -1,0 +1,12 @@
+The users are strongly suggested that they generate the lmdb datasets
+by themselves using the codes provided in ../data_preparation/. This
+is because the sizes of the datasets used in our experiments are
+extraordinary large. 
+
+For example, the size of one single "basic500k_cover_stego40_train"
+dataset is 115 gigabytes while the size of the largest
+"basic5000k_cover_stego40_train" is 1.5 terabytes!
+
+However, we can provide the FTP site to the users who can not generate
+the lmdb dataset by themselves to download the training/testing
+datasets. Just send a request mail to tansq@szu.edu.cn.

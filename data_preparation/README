@@ -1,0 +1,15 @@
+The JPEG images should be decompressed to their corresponding
+floating-point spatial representations firstly before they are fed
+into our proposed framework.
+
+For example, ./originals/cover/n00440382_15706.jpg is decompressed to
+./spatial_representations/cover/n00440382_15170.spatial.
+
+./create_dataset.py reads in each cover spatial representation and its
+corresponding stego spatial representation in pair to generate the
+resulting lmdb dataset.
+
+PLEASE NOTE that due to some authorization issues, the program to
+decompress the JPEG images to their corresponding spatial
+representations can not be provided here. phill salee's jpeg toolbox
+is a good alternative.
