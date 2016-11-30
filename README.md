@@ -13,4 +13,4 @@ Directories included in the implementation
 'datasets/' - the instruction regarding to the datasets used in the experiments.
 'dctrqt_caffe/' - The patches to Caffe with our implemented layers.
 'image_lists/' - the lists of the ImageNet images used in the experiments and the shell script used to generate them.
-'protos/' - the protos and the trained Caffe models.
+'protos/' - the protos and the trained Caffe models. 
